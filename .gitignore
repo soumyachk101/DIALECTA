@@ -25,3 +25,8 @@ design-system/dialecta/
 # Database
 *.db
 *.sqlite
+
+# Python packaging
+*.egg-info/
+build/
+BUGS_AND_ISSUES_REPORT.md

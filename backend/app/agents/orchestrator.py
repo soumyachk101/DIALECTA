@@ -8,7 +8,6 @@ the debate in real time, hitting the <1.5s first-token target per TRD §4.
 from __future__ import annotations
 
 import asyncio
-import json
 import uuid
 from collections.abc import AsyncIterator
 
@@ -31,13 +30,13 @@ async def run_debate(
     page_context: dict | None,
 ) -> AsyncIterator[dict]:
     """
-    Yields events for the client. Event types:
+    Yield events for the client. Event types:
       {"type": "context_loaded", ...}
-      {"type": "token", "agent": str, "delta": str, "turn_order": int}   (many per agent)
+      {"type": "token", "agent": str, "delta": str, "turn_order": int}
       {"type": "agent_done", "agent": str, "turn_order": int, "turn": {...}}
       {"type": "moderator_token", "delta": str}
-      {"type": "moderator_done", "turn": {...}}
-      {"type": "done"}
+      {"type": "moderator_done", "turn_order": int, "turn": {...}}
+      {"type": "done", "session_id": str}
     """
     # 1. Context fetch
     bundle = await gather_context(session, user_id, page_context)
@@ -45,51 +44,36 @@ async def run_debate(
 
     yield {"type": "context_loaded", "session_id": str(session_id), "detail": "context ready"}
 
-    # 2. Parallel agent debate — stream each agent's tokens
-    async def stream_one(agent: str, order: int) -> tuple[str, int, dict]:
-        """Collect all events for one agent, return (agent, order, final_turn)."""
-        final_turn: dict | None = None
-        async for ev in stream_agent(agent, decision, context_str):
-            if ev["type"] == "done":
-                final_turn = ev["turn"]
-            # Re-emit to the outer caller with agent/order stamped on
-            yield_event = {**ev, "agent": agent, "turn_order": order}
-            if ev["type"] == "token":
-                yield_event["type"] = "token"
-            yield yield_event
-        if final_turn is None:
-            final_turn = {
-                "message": "[no output]",
-                "citations": [],
-                "confidence": 0.3,
-                "no_context_found": True,
-            }
-        return agent, order, final_turn
-
-    # Use a queue + tasks to interleave tokens from all 4 agents in real time
+    # 2. Parallel agent debate — stream each agent's tokens via a queue
     queue: asyncio.Queue[tuple[str, str, dict]] = asyncio.Queue()
     tasks: list[asyncio.Task] = []
 
     async def runner(agent: str, order: int) -> None:
-        async for ev in stream_agent(agent, decision, context_str):
-            await queue.put(("event", agent, {**ev, "agent": agent, "turn_order": order}))
-        await queue.put(("done", agent, {"agent": agent, "turn_order": order}))
+        try:
+            async for ev in stream_agent(agent, decision, context_str):
+                await queue.put(("event", agent, {**ev, "agent": agent, "turn_order": order}))
+        except Exception as e:
+            fallback = {"type": "agent_done", "agent": agent, "turn_order": order,
+                        "turn": {"message": f"[error: {e}]", "citations": [],
+                                  "confidence": 0.3, "no_context_found": True}}
+            await queue.put(("event", agent, fallback))
+        finally:
+            await queue.put(("done", agent, {"agent": agent, "turn_order": order}))
 
     for i, agent in enumerate(TURN_ORDER, start=1):
         tasks.append(asyncio.create_task(runner(agent, i)))
 
-    persisted: list[dict] = [None] * 4  # one slot per agent
+    persisted_by_order: dict[int, dict] = {}
     completed_agents: set[str] = set()
 
-    while len(completed_agents) < 4:
+    while len(completed_agents) < len(TURN_ORDER):
         kind, agent, payload = await queue.get()
         if kind == "event":
-            yield payload  # token or agent_done
+            yield payload
             if payload.get("type") == "agent_done":
-                # Persist this agent's final turn
-                turn = payload["turn"]
                 order = payload["turn_order"]
-                persisted[order - 1] = {"agent": agent, **turn, "turn_order": order}
+                turn = payload["turn"]
+                persisted_by_order[order] = {"agent": agent, **turn, "turn_order": order}
                 db_turn = DebateTurn(
                     session_id=session_id, agent=agent, message=turn["message"],
                     citations=turn.get("citations", []), confidence=turn.get("confidence"),
@@ -101,15 +85,14 @@ async def run_debate(
             completed_agents.add(agent)
 
     await asyncio.gather(*tasks)
-    # Drop the None placeholders
-    persisted_turns = [t for t in persisted if t is not None]
+    persisted_turns = [persisted_by_order[k] for k in sorted(persisted_by_order)]
 
     # 3. Moderator synthesis
     moderator_order = len(persisted_turns) + 1
     final_turn: dict | None = None
     async for ev in stream_agent("moderator", decision, context="", other_turns=persisted_turns):
         if ev["type"] == "token":
-            yield {**ev, "type": "moderator_token"}
+            yield {**ev, "type": "moderator_token", "turn_order": moderator_order}
         elif ev["type"] == "done":
             final_turn = ev["turn"]
             yield {
@@ -134,7 +117,6 @@ async def run_debate(
     )
     session.add(db_mod)
 
-    # 4. Mark session complete
     db_session = await session.get(DebateSession, session_id)
     if db_session:
         db_session.status = "completed"
@@ -143,7 +125,7 @@ async def run_debate(
     yield {"type": "done", "session_id": str(session_id)}
 
 
-# ---- Legacy non-streaming run_debate_blocking — used by tests + API fallback ----
+# ---- Blocking path — used by tests + the REST ?stream=true replay ----
 
 async def run_debate_blocking(
     session: AsyncSession,
@@ -152,8 +134,6 @@ async def run_debate_blocking(
     user_id: uuid.UUID,
     page_context: dict | None,
 ) -> AsyncIterator[WSMessage]:
-    """Non-streaming path. Yields WSMessage envelopes (1 per turn, not per token).
-    Used by tests and as a fallback when streaming is undesirable."""
     from app.agents.runner import run_agents_parallel, run_moderator
 
     bundle = await gather_context(session, user_id, page_context)

@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.json && node scripts/copy-static.mjs",
-    "dev": "tsc -p tsconfig.json --watch",
-    "package": "npm run build && node scripts/package.mjs"
+    "typecheck": "tsc -p tsconfig.json",
+    "package": "npm run build"
   },
   "devDependencies": {
     "@types/chrome": "^0.0.287",
