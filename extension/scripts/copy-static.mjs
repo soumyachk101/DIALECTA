@@ -13,7 +13,13 @@ async function emitJs(src, dest) {
   const cleaned = text
     .replace(/^import\s+["'][^"']+\.css["'];?\s*$/gm, "")
     .replace(/^import\s+["'][^"']+["'];?\s*$/gm, "");
+  await mkdir(dest.replace(/\/[^/]+$/, ""), { recursive: true });
   await writeFile(dest, cleaned);
+}
+
+async function copyAsset(src, dest) {
+  await mkdir(dest.replace(/\/[^/]+$/, ""), { recursive: true });
+  await cp(src, dest);
 }
 
 if (existsSync("src/background/service-worker.ts")) {
@@ -32,22 +38,22 @@ if (existsSync("src/options/options.ts")) {
   await emitJs("src/options/options.ts", "dist/src/options/options.js");
 }
 if (existsSync("src/content/overlay.css")) {
-  await cp("src/content/overlay.css", "dist/src/content/overlay.css");
+  await copyAsset("src/content/overlay.css", "dist/src/content/overlay.css");
 }
 if (existsSync("src/popup/popup.css")) {
-  await cp("src/popup/popup.css", "dist/src/popup/popup.css");
+  await copyAsset("src/popup/popup.css", "dist/src/popup/popup.css");
 }
 if (existsSync("src/popup/popup.html")) {
-  await cp("src/popup/popup.html", "dist/src/popup/popup.html");
+  await copyAsset("src/popup/popup.html", "dist/src/popup/popup.html");
 }
 if (existsSync("src/popup/debate.css")) {
-  await cp("src/popup/debate.css", "dist/src/popup/debate.css");
+  await copyAsset("src/popup/debate.css", "dist/src/popup/debate.css");
 }
 if (existsSync("src/popup/debate.html")) {
-  await cp("src/popup/debate.html", "dist/src/popup/debate.html");
+  await copyAsset("src/popup/debate.html", "dist/src/popup/debate.html");
 }
 if (existsSync("src/options/options.html")) {
-  await cp("src/options/options.html", "dist/src/options/options.html");
+  await copyAsset("src/options/options.html", "dist/src/options/options.html");
 }
 
 // Patch manifest.json to point at the emitted .js

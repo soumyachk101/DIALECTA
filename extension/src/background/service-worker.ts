@@ -19,8 +19,8 @@ interface InterceptedAction {
 }
 
 async function createSession(action: InterceptedAction) {
-  const decisionSummary = action.page_context?.item
-    ? `About to buy: ${action.page_context.item} for ${action.page_context.amount ?? "unknown"} ${action.page_context.currency ?? ""}`.trim()
+  const decisionSummary = action.pageContext?.item
+    ? `About to buy: ${action.pageContext.item} for ${action.pageContext.amount ?? "unknown"} ${action.pageContext.currency ?? ""}`.trim()
     : `Intercepted ${action.type} action on ${action.pageContext.page_title}`;
 
   const res = await fetch(`${BACKEND_URL}/v1/sessions`, {
