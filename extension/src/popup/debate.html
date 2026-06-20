@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>DIALECTA · Debate</title>
+    <link rel="stylesheet" href="debate.css" />
+  </head>
+  <body>
+    <div class="debate">
+      <header class="debate-header">
+        <div class="brand">DIALECTA</div>
+        <div class="meta">
+          <span class="dot" id="conn-dot"></span>
+          <span id="conn-text">connecting…</span>
+        </div>
+      </header>
+
+      <main class="stage">
+        <div class="radial" id="radial">
+          <div class="decision" id="decision">
+            <div class="decision-label">DECISION</div>
+            <div class="decision-text" id="decision-text">…</div>
+          </div>
+
+          <div class="seat seat-optimist" data-agent="optimist">
+            <div class="seat-glyph">▲</div>
+            <div class="seat-name">OPTIMIST</div>
+            <div class="seat-msg" data-msg></div>
+          </div>
+          <div class="seat seat-skeptic" data-agent="skeptic">
+            <div class="seat-glyph">?</div>
+            <div class="seat-name">SKEPTIC</div>
+            <div class="seat-msg" data-msg></div>
+          </div>
+          <div class="seat seat-analyst" data-agent="analyst">
+            <div class="seat-glyph">#</div>
+            <div class="seat-name">ANALYST</div>
+            <div class="seat-msg" data-msg></div>
+          </div>
+          <div class="seat seat-ethicist" data-agent="ethicist">
+            <div class="seat-glyph">◉</div>
+            <div class="seat-name">ETHICIST</div>
+            <div class="seat-msg" data-msg></div>
+          </div>
+        </div>
+      </main>
+
+      <footer class="debate-footer" id="footer" hidden>
+        <div class="moderator" id="moderator">
+          <div class="moderator-label">MODERATOR</div>
+          <div class="moderator-msg" id="moderator-msg"></div>
+        </div>
+        <div class="actions">
+          <button class="btn-ghost" data-outcome="overridden">Continue anyway</button>
+          <button class="btn-primary" data-outcome="accepted">Cancel</button>
+          <button class="btn-text" data-outcome="ignored">Dismiss</button>
+        </div>
+      </footer>
+    </div>
+    <script type="module" src="debate.ts"></script>
+  </body>
+</html>

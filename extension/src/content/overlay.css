@@ -1,0 +1,7 @@
+/* Overlay styles are loaded with the content script but only used by the popup debate view,
+   which inherits from the dashboard stylesheet in production. Kept minimal here. */
+
+.dialecta-inline-badge {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.01em;
+}
