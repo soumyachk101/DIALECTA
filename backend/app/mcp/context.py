@@ -18,7 +18,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.orm import ConnectedAccount, UserValue
 from app.services.crypto import decrypt_token
 
-
 # ---- Public data shapes returned to the orchestrator ----
 
 @dataclass
@@ -56,7 +55,7 @@ class ContextBundle:
 # app.mcp.providers; the in-memory mock implementations are kept here so the
 # demo works without any external credentials.
 
-from typing import Awaitable, Callable
+from collections.abc import Awaitable, Callable
 
 ProviderFn = Callable[[str, uuid.UUID], Awaitable[tuple[list[Citation], bool]]]
 

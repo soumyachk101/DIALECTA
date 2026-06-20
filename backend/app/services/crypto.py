@@ -1,5 +1,6 @@
 """Fernet-based encryption for OAuth tokens (BACKEND_SCHEMA.md §4)."""
 from cryptography.fernet import Fernet
+
 from app.config import get_settings
 
 
@@ -10,7 +11,8 @@ def _fernet() -> Fernet:
         return Fernet(key.encode())
     except Exception:
         # Derive a Fernet key from raw bytes via SHA256
-        import base64, hashlib
+        import base64
+        import hashlib
         digest = hashlib.sha256(key.encode()).digest()
         return Fernet(base64.urlsafe_b64encode(digest))
 

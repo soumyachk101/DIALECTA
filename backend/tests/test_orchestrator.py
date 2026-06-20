@@ -1,17 +1,19 @@
 """Tests for the orchestrator's blocking path + DB persistence."""
 import uuid
-from datetime import datetime
 
 import pytest
 from sqlalchemy import select
 
 from app.agents.orchestrator import run_debate_blocking
 from app.models.orm import (
-    ConnectedAccount, DebateSession, DebateTurn, User, UserValue,
+    ConnectedAccount,
+    DebateSession,
+    DebateTurn,
+    User,
+    UserValue,
 )
 from app.schemas.api import WSMessage
 from app.services.crypto import encrypt_token
-
 
 DEMO_USER_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
 DEMO_TOKEN = encrypt_token("demo-token-not-real")

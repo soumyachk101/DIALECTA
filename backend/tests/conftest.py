@@ -2,15 +2,15 @@
 
 Uses an in-memory SQLite DB (via aiosqlite) for fast hermetic tests.
 Postgres-specific types (UUID, JSONB, BYTEA) are emulated on SQLite.
+Postgres-specific server defaults (`gen_random_uuid()`, `func.now()`) are
+swapped for client-side Python defaults so SQLite can satisfy them.
 """
-import asyncio
 import os
 import uuid
-from typing import AsyncIterator
+from collections.abc import AsyncIterator
+from datetime import UTC, datetime
 
-import pytest
 import pytest_asyncio
-
 
 # Configure settings BEFORE importing the app
 os.environ.setdefault("ENVIRONMENT", "development")
@@ -18,10 +18,10 @@ os.environ.setdefault("USE_DEMO_FALLBACK", "true")
 os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
 os.environ.setdefault("TOKEN_ENCRYPTION_KEY", "test-only-key-not-real")
 
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.sqlite.base import SQLiteDialect
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.types import JSON, LargeBinary, TypeDecorator
-from sqlalchemy.dialects.postgresql import JSONB, BYTEA, UUID
-from sqlalchemy.dialects.sqlite.base import SQLiteDialect
 
 from app.db.session import Base
 from app.models import orm  # noqa: F401
@@ -79,21 +79,47 @@ class _SQLiteUUID(TypeDecorator):
         return uuid.UUID(value) if value is not None else None
 
 
-# Monkey-patch column types on already-imported models (Postgres → SQLite compat)
-from sqlalchemy import Boolean, CheckConstraint, Column as _Col
-from sqlalchemy.dialects.postgresql import UUID as _PGUUID, JSONB as _PGJSONB, BYTEA as _PGBYTEA
+# Monkey-patch column types AND server defaults on already-imported models so
+# SQLite can satisfy them without invoking Postgres-only `gen_random_uuid()` /
+# `func.now()` server functions.
 import sqlalchemy as _sa
+from sqlalchemy.dialects.postgresql import BYTEA as _PGBYTEA
+from sqlalchemy.dialects.postgresql import JSONB as _PGJSONB
+from sqlalchemy.dialects.postgresql import UUID as _PGUUID
+from sqlalchemy.sql.schema import ColumnDefault
+
+
+def _uuid_default():
+    return str(uuid.uuid4())
+
+
+def _now_default():
+    return datetime.now(UTC)
 
 
 def _patch_columns():
     for table in Base.metadata.tables.values():
         for col in table.columns:
+            # Type patches — Postgres → SQLite friendly equivalents
             if isinstance(col.type, _PGUUID):
                 col.type = _SQLiteUUID()
             elif isinstance(col.type, _PGJSONB):
                 col.type = _JSONBCompat()
             elif isinstance(col.type, _PGBYTEA):
                 col.type = _BYTEACompat()
+            # Server-default patches — drop Postgres-only `gen_random_uuid()`
+            # / `now()` server functions and replace with client-side defaults.
+            sd = col.server_default
+            if sd is None:
+                continue
+            arg = getattr(sd, "arg", None)
+            arg_text = str(arg) if arg is not None else ""
+            if "gen_random_uuid" in arg_text:
+                col.server_default = None
+                col.default = ColumnDefault(_uuid_default, for_update=False)
+            elif "now()" in arg_text and isinstance(col.type, _sa.DateTime):
+                col.server_default = None
+                col.default = ColumnDefault(_now_default, for_update=False)
 
 
 _patch_columns()

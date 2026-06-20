@@ -8,7 +8,7 @@ leaves this function. The result is a list of structured Citation objects
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from app.mcp.context import Citation
 
@@ -21,7 +21,7 @@ async def fetch_calendar_summary(token: str, user_id: uuid.UUID) -> tuple[list[C
     except ImportError:
         return [], True
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     until = now + timedelta(hours=24)
     params = {
         "timeMin": now.isoformat(),

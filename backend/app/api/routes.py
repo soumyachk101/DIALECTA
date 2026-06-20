@@ -15,7 +15,7 @@ import uuid
 from collections.abc import AsyncIterator
 
 from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect
-from sqlalchemy import select, desc
+from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.orchestrator import run_debate, run_debate_blocking
@@ -28,7 +28,6 @@ from app.schemas.api import (
     ResolveRequest,
     SessionResponse,
     TurnResponse,
-    WSMessage,
 )
 
 router = APIRouter(prefix="/v1")

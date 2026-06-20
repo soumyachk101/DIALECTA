@@ -18,7 +18,8 @@ import asyncio
 import json
 import re
 import time
-from typing import Any, AsyncIterator, Literal
+from collections.abc import AsyncIterator
+from typing import Any, Literal
 
 from app.agents.prompts import MODERATOR, PERSONAS
 from app.config import get_settings
@@ -141,7 +142,17 @@ async def run_agent(
     context: str,
     other_turns: list[dict] | None = None,
 ) -> dict:
-    """Return one agent's full turn as a dict. Falls back to demo on error/timeout."""
+    """Return one agent's full turn as a dict with an `agent` key. Falls back to demo on error/timeout."""
+    turn = await _run_agent_raw(agent, decision, context, other_turns)
+    return {"agent": agent, **turn}
+
+
+async def _run_agent_raw(
+    agent: AgentName,
+    decision: str,
+    context: str,
+    other_turns: list[dict] | None = None,
+) -> dict:
     settings = get_settings()
     has_keys = bool(settings.groq_api_key and settings.anthropic_api_key)
     if not has_keys and settings.use_demo_fallback:
@@ -197,7 +208,7 @@ async def stream_agent(
         # Demo mode — emit the full text in one chunk so the UI still animates
         demo = DEMO_TURNS[agent]
         yield {"type": "token", "delta": demo["message"]}
-        yield {"type": "done", "turn": demo}
+        yield {"type": "done", "turn": {"agent": agent, **demo}}
         return
 
     provider, system = _provider_for(agent)
@@ -227,22 +238,27 @@ async def stream_agent(
         if settings.use_demo_fallback:
             demo = DEMO_TURNS[agent]
             yield {"type": "token", "delta": demo["message"]}
-            yield {"type": "done", "turn": demo}
+            yield {"type": "done", "turn": {"agent": agent, **demo}}
             return
-        yield {"type": "done", "turn": _empty_turn("timeout")}
+        yield {"type": "done", "turn": {"agent": agent, **_empty_turn("timeout")}}
         return
 
     raw = "".join(chunks)
     try:
         parsed = _extract_json(raw)
-        turn = {
+        turn: dict[str, Any] = {
+            "agent": agent,
             "message": parsed["message"],
             "citations": parsed.get("citations", []),
             "confidence": float(parsed.get("confidence", 0.7)),
             "no_context_found": bool(parsed.get("no_context_found", False)),
         }
     except Exception:
-        turn = _empty_turn("parse_error")
+        turn = {"agent": agent, **_empty_turn("parse_error")}
+
+    if first_token_at is not None:
+        turn["first_token_ms"] = int((first_token_at - started) * 1000)
+    yield {"type": "done", "turn": turn}
 
     if first_token_at is not None:
         turn["first_token_ms"] = int((first_token_at - started) * 1000)
@@ -256,7 +272,7 @@ async def _with_timeout(async_iter: AsyncIterator, timeout: float) -> AsyncItera
         try:
             item = await asyncio.wait_for(aiter.__anext__(), timeout=timeout)
             yield item
-        except (asyncio.TimeoutError, StopAsyncIteration):
+        except (TimeoutError, StopAsyncIteration):
             return
 
 

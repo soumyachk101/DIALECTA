@@ -3,10 +3,9 @@ import uuid
 
 import pytest
 
-from app.mcp.context import Citation, gather_context, bundle_to_agent_context
+from app.mcp.context import Citation, bundle_to_agent_context, gather_context
 from app.models.orm import ConnectedAccount, User, UserValue
 from app.services.crypto import decrypt_token, encrypt_token
-
 
 DEMO_USER_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
 

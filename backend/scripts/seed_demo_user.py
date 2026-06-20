@@ -2,12 +2,9 @@
 import asyncio
 import uuid
 
-from sqlalchemy import select
-
 from app.db.session import SessionLocal
 from app.models.orm import ConnectedAccount, User, UserValue
 from app.services.crypto import encrypt_token
-
 
 DEMO_USER_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
 DEMO_TOKEN = encrypt_token("demo-oauth-token-not-real")

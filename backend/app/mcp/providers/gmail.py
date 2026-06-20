@@ -5,7 +5,6 @@ Read-only metadata + relevant thread snippets only. Never returns raw bodies.
 """
 from __future__ import annotations
 
-import base64
 import uuid
 
 from app.mcp.context import Citation
